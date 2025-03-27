@@ -30,7 +30,7 @@ SetCompressor /SOLID lzma
 !define DEBUG_BUILD 0
 !define DEBUG_NO_THIRDPARTY 0
 # set to "0" for deployment!!! use "1" to skip packaging of *.html files (takes ages)
-!define DEBUG_SKIP_DOCU 0
+!define DEBUG_SKIP_DOCU 1
 
 ##################
 ###   SCRIPT   ###
