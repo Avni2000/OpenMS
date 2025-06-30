@@ -1,0 +1,401 @@
+# This does the whole cmake build of OpenMS on github's runners. It is intended to replace our current Jenkins based jobs.
+# For Nightly and Release branches it builds the packages and submits them to our archive. 
+# NB: The actual upload is currently commented out so that this can get merged to develop. It will be re-added presently.
+name: build-test
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events or manually via workflow_dispatch
+on:
+  workflow_dispatch:
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            # cl.exe is currently the only supported. Needs a VS shell to be set up (especially if used without VS CMake Generator)
+            # clang.exe is also installed but untested (might crash with our VS specific compiler definitions)
+            # clang-cl.exe might be used instead.
+            compiler: cl.exe
+            # VS 2022: 14.30-14.39 (corresponds to MSVC v143)
+            # VS 2019: 14.20-14.29 (corresponds to MSVC v142)
+            compiler_ver: 14.36    # Specific toolset version for VS 2022 -- must (roughly) match Qt6 compiler (see below)
+
+          - os: macos-13
+            # Since the appleclang version is dependent on the XCode versions that are installed
+            #  on the GH runners, use this as the choice for a specific version
+            # TODO currently unused but XCode/appleclang is the default
+            compiler: xcode
+            # TODO implement support for other versions
+            compiler_ver: 14.2
+
+          - os: macos-14
+            # Since the appleclang version is dependent on the XCode versions that are installed
+            #  on the GH runners, use this as the choice for a specific version
+            # TODO currently unused but XCode/appleclang is the default
+            compiler: xcode
+            # TODO implement support for other versions
+            compiler_ver: 15.0.1
+
+          # Make sure the compilers are available in that version on the GH runners
+          # We are not installing anything.
+          - os: ubuntu-22.04
+            compiler: g++
+
+            compiler_ver: 11
+          # Make sure the compilers are available in that version on the GH runners
+          # We are not installing anything.
+          
+          #- os: ubuntu-22.04-arm
+          #  compiler: g++
+          #  compiler_ver: 11
+
+
+          - os: ubuntu-22.04
+            compiler: clang++
+            compiler_ver: 15
+    outputs:
+      version_number: ${{ steps.create_changelog.outputs.version_number }}
+
+    runs-on: ${{ matrix.os }}
+    env: 
+      TERM: xterm-256color
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: OpenMS
+
+    - id: extract_branch
+      name: Extract branch/PR infos
+      shell: bash
+      run: echo "RUN_NAME=${{ github.event.pull_request && github.event.number || github.ref_name }}" >> $GITHUB_OUTPUT
+
+    - name: Get number of CPU cores
+      uses: SimenB/github-actions-cpu-cores@v2
+      id: cpu-cores
+
+    - id: set-vars
+      name: Set extra variables
+      run: |
+        DO_PACKAGE=$( [[ ( "${{ inputs.package }}" || "${{ steps.extract_branch.outputs.RUN_NAME }}" == "nightly" || "${{ steps.extract_branch.outputs.RUN_NAME }}" =~ release/* ) && "${{ matrix.compiler }}" != "clang++" ]] && echo true || echo false)
+        echo $DO_PACKAGE
+        if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
+          echo "tp_folder=Linux" >> $GITHUB_OUTPUT
+          echo "xvfb=xvfb-run -a" >> $GITHUB_OUTPUT
+          echo "static_boost=OFF" >> $GITHUB_OUTPUT
+          # always run doxygen on Ubuntu (because its fast), to detect Doxygen errors
+          echo "enable_docs=ON" >> $GITHUB_OUTPUT  
+          if [ "$DO_PACKAGE" = true ]; then
+            echo "pkg_type=deb" >> $GITHUB_OUTPUT
+          else
+            echo "pkg_type=none" >> $GITHUB_OUTPUT
+          fi
+          echo "cxx_compiler=${{ matrix.compiler }}-${{ matrix.compiler_ver }}" >> $GITHUB_OUTPUT
+        fi
+        
+        if [[ "${{ matrix.os }}" == windows-* ]]; then
+          echo "tp_folder=Windows" >> $GITHUB_OUTPUT
+          echo "contrib_os=windows" >> $GITHUB_OUTPUT
+          echo "contrib_os_ver=" >> $GITHUB_OUTPUT
+          echo "contrib_compiler=msvc-14.2/" >> $GITHUB_OUTPUT
+          echo "xvfb=" >> $GITHUB_OUTPUT
+          echo "static_boost=ON" >> $GITHUB_OUTPUT
+          if [ "$DO_PACKAGE" = true ]; then
+            echo "pkg_type=nsis" >> $GITHUB_OUTPUT
+            echo "enable_docs=ON" >> $GITHUB_OUTPUT
+          else
+            echo "pkg_type=none" >> $GITHUB_OUTPUT           
+            echo "enable_docs=OFF" >> $GITHUB_OUTPUT
+          fi
+          echo "cxx_compiler=${{ matrix.compiler }}" >> $GITHUB_OUTPUT
+        fi
+
+        if [[ "${{ matrix.os }}" == macos-* ]]; then
+          echo "tp_folder=MacOS" >> $GITHUB_OUTPUT
+          echo "contrib_os=macOS" >> $GITHUB_OUTPUT
+          echo "contrib_os_ver=10.15.5/" >> $GITHUB_OUTPUT
+          echo "contrib_compiler=appleclang-11.0.0/" >> $GITHUB_OUTPUT
+          echo "xvfb=" >> $GITHUB_OUTPUT
+          echo "static_boost=OFF" >> $GITHUB_OUTPUT
+          if [ "$DO_PACKAGE" = true ]; then
+            echo "pkg_type=pkg" >> $GITHUB_OUTPUT
+            echo "enable_docs=ON" >> $GITHUB_OUTPUT
+          else
+            echo "pkg_type=none" >> $GITHUB_OUTPUT
+            echo "enable_docs=OFF" >> $GITHUB_OUTPUT
+
+          fi
+          if [[ "${{ matrix.compiler }}" == "xcode" ]]; then
+            sudo xcode-select -s '/Applications/Xcode_${{ matrix.compiler_ver }}.app/Contents/Developer'
+            echo "cxx_compiler=clang++" >> $GITHUB_OUTPUT
+          elif [[ "${{ matrix.compiler }}" == "clang++" ]]; then
+            echo "cxx_compiler=$(brew --prefix llvm@${{ matrix.compiler_ver }})/bin/clang++" >> $GITHUB_OUTPUT
+          else
+            echo "Unsupported compiler"
+            exit 1
+          fi
+        fi
+      shell: bash
+
+    # Create the changelog for the release from our overall changelog
+    - id: create_changelog
+      if: matrix.compiler != 'clang++' && startsWith(steps.extract_branch.outputs.RUN_NAME,'release') && startsWith(matrix.os, 'ubuntu')
+      shell: bash
+      name: Create changelog for release on Ubuntu + GCC
+      run: |
+        if [[ ${{ steps.extract_branch.outputs.RUN_NAME }} =~ ^release\/([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+          VERSION_NUMBER=${BASH_REMATCH[1]}
+          echo "Version number: $VERSION_NUMBER"
+          if [ "${VERSION_NUMBER##*.}" -eq "0" ] # Handle trailing 0 in major releases (eg 3.0.0)
+          then
+            VERSION_NUMBER=${VERSION_NUMBER%.*}
+          fi
+          echo "version_number=$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          grep -ne "----[[:space:]]*OpenMS" ${{ github.workspace }}/OpenMS/CHANGELOG > index_changelog.txt 
+          START=$(cat index_changelog.txt | grep -A 1 -E " $VERSION_NUMBER(\.0)? " | cut -f1 -d: | head -1)
+          END=$(cat index_changelog.txt | grep -A 1 -E " $VERSION_NUMBER(\.0)? " | cut -f1 -d: | tail -1)
+          echo "Extracting between lines:"
+          echo $START
+          echo $END
+          awk "NR > $START && NR < $END" OpenMS/CHANGELOG > ${{ github.workspace }}/changelog.txt
+        else
+          echo "Branch name does not match the expected pattern."
+          exit 1
+        fi
+
+    - name: check input options
+      if: github.event_name == 'workflow_dispatch'
+      shell: bash
+      run: |
+          # check if we want to be marked as latest, and if we actually should.
+          if [[ 'true' == ${{ inputs.do_release }} ]]; then
+            if [[ 'false' == ${{ inputs.knime }} || 'false' == ${{ inputs.package }} ]]; then
+              echo "Can't do a release without building the OpenMS package and the KNIME package"
+              exit 1
+            else
+              if [[ 'true' == ${{ inputs.mark_as_latest }} && "$(git tag -l ${{ steps.create_changelog.outputs.version_number }})" ]]; then
+                echo "Can't mark as latest, a tag with the same version already exists"
+                exit 1
+              fi
+            fi
+          else
+            if [[ 'true' == ${{ inputs.mark_as_latest }} || 'true' == ${{inputs.announce_release}} ]]; then
+              echo "Can't mark as latest or announce release unless we do a release"
+              exit 1
+            fi
+          fi
+
+    - name: Emulate a Visual Studio shell (Windows)
+      if: startsWith(matrix.os, 'windows')
+      uses: egor-tensin/vs-shell@v2
+      with:
+        # NOTE: x64 is hardcoded. No support for 32bit
+        arch: x64
+
+    - name: Install Qt (Windows)
+      if: startsWith(matrix.os, 'windows')
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.8.3'    ## Note this version is build with win64_msvc2022_64 and should always match what we use
+        arch: 'win64_msvc2022_64'
+        cache: 'false'
+        archives: 'qtsvg qtimageformats qtbase'
+
+    - name: Setup build tools (and system contrib on Linux and Mac)
+      id: tools-prefix
+      shell: bash
+      env: 
+        # We need to add this, otherwise brew "helpfully" updates all of the GitHub preinstalled packages, which can cause issues
+        HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+      run: |
+        if [[ "${{ matrix.os }}" == ubuntu-* ]]; then
+          # WARNING: Don't add any dependency install commands here.
+          # Instead edit the following script:
+          bash OpenMS/tools/ci/deps-ubuntu.sh
+          echo "Testing doxygen" && doxygen --version
+          echo "cmake_prefix=" >>$GITHUB_OUTPUT
+        fi
+        
+        if [[ "${{ matrix.os }}" == windows-* ]]; then
+          # QT_ROOT_DIR set by Install Qt step
+          echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR" >> $GITHUB_OUTPUT
+          choco install ccache ninja -y --no-progress
+          choco install cmake -y --no-progress
+          ## GH CLI "SHOULD BE" installed. Sometimes I had to manually install nonetheless. Super weird.
+          # https://github.com/actions/runner-images/blob/main/images/win/scripts/Installers/Install-GitHub-CLI.ps1
+          echo "C:\Program Files (x86)\GitHub CLI" >> $GITHUB_PATH
+          # Install eigen from choco
+          choco install eigen -y --no-progress
+          echo "eigen_choco=C:\ProgramData\chocolatey\lib\eigen\share\cmake" >> $GITHUB_OUTPUT
+          choco install doxygen.portable ghostscript graphviz -y --no-progress
+          
+          if [[ "${{ steps.set-vars.outputs.pkg_type }}" != "none" ]]; then
+            # uses a custom NSIS, which provides 8-k string support and has UltraModernUI integrated already
+            curl --no-progress-meter -L -o NSIS.tar.gz https://github.com/OpenMS/NSIS/raw/main/NSIS.tar.gz
+            ## overwrite existing NSIS (which has only 1k-string support)
+            7z x -so NSIS.tar.gz | 7z x -si -ttar -aoa -o"C:/Program Files (x86)/NSIS/"
+          fi
+        fi
+
+        if [[ "${{ matrix.os }}" == macos-* ]]; then
+          # WARNING: Don't add any brew install commands here, edit
+          # the following script instead:
+          bash OpenMS/tools/ci/deps-macos.sh
+          echo "cmake_prefix=$(brew --prefix qt)/lib/cmake;$(brew --prefix qt);$(brew --prefix libomp)" >>$GITHUB_OUTPUT
+        fi
+
+    - name: Cache contrib (Windows)
+      if: startsWith(matrix.os, 'windows')
+      id: cache-contrib
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}/OpenMS/contrib
+        key: ${{ runner.os }}-contrib3
+    
+    - name: Download contrib build from archive (Windows)
+      if: startsWith(matrix.os, 'windows') && steps.cache-contrib.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+          cd OpenMS/contrib
+          # Download the file using the URL fetched from GitHub
+          gh release download -R OpenMS/contrib --pattern 'contrib_build-Windows.tar.gz'
+          # Extract the archive
+          7z x -so contrib_build-Windows.tar.gz | 7z x -si -ttar
+          rm contrib_build-Windows.tar.gz
+          ls -la
+
+    - name: Setup ccache cache
+      uses: actions/cache@v4
+      with:
+        path: .ccache
+        key: ${{ runner.os }}-${{ runner.arch }}-ccache-${{ steps.extract_branch.outputs.RUN_NAME }}-${{ github.run_number }}
+        # Restoring: From current branch/PR, otherwise from nightly, otherwise from any branch.
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-ccache-${{ steps.extract_branch.outputs.RUN_NAME }}
+          ${{ runner.os }}-${{ runner.arch }}-ccache-develop
+          ${{ runner.os }}-${{ runner.arch }}-ccache-
+
+    - name: Add THIRDPARTY
+      shell: bash
+      run: |
+          # initialize THIRDPARTY
+          cd OpenMS
+          git submodule update --init THIRDPARTY
+          cd ..
+          # add third-party binaries to PATH
+          # use flat THIRDPARTY structure
+          THIRDPARTY_DIR="OpenMS/THIRDPARTY"
+          mkdir -p _thirdparty
+          # Copy the correct architecture
+          cp -R "$THIRDPARTY_DIR/${{ steps.set-vars.outputs.tp_folder }}/$(uname -m)"/* _thirdparty/          
+          # For MacOS 14 we also want to copy over any tools that we only have in x86_64 flavor.
+          if [[ "${{ matrix.os }}" == macos-14 ]]; then
+            echo "Copying x86_64 tools for MacOS 14"
+            for tool in $THIRDPARTY_DIR/MacOS/x86_64/*; do
+              toolname=$(basename "$tool")
+              if [[ ! -e "_thirdparty/$toolname" ]]; then
+                echo "Copying missing tool from x86_64: $toolname"
+                cp -R "$tool" "_thirdparty/"
+              fi
+            done
+          fi
+          cp -R OpenMS/THIRDPARTY/All/* _thirdparty/
+          # add third-party binaries to PATH
+          for thirdpartytool in '${{ github.workspace }}/_thirdparty'/*
+          do
+            if [[ "${{ matrix.os }}" == windows-* ]]; then
+              # substitute slashes
+              echo ${thirdpartytool//\//\\} >> $GITHUB_PATH
+            else
+              echo $thirdpartytool >> $GITHUB_PATH
+            fi
+          done
+
+   # Upload the changelog to the same artifact that we will add the installers to.
+    - name: Upload changelog as artifact
+      if: steps.set-vars.outputs.pkg_type != 'none' && startsWith(steps.extract_branch.outputs.RUN_NAME,'release') && startsWith(matrix.os, 'ubuntu')
+      uses: actions/upload-artifact@v4
+      with:
+        name: changelog.txt
+        path: |
+          ${{ github.workspace }}/changelog.txt
+
+    - name: Build
+      shell: bash
+      run: |
+          # do not fail immediately
+          set +e
+
+          # Generate the CWL descriptors if we are going to build a package
+          if [ ${{steps.set-vars.outputs.pkg_type }} != "none" ]; then
+            python -m venv openms-cwl
+            source openms-cwl/bin/activate
+            pip install -q cwltool
+            export ENABLE_CWL=ON
+          fi
+
+          mkdir $GITHUB_WORKSPACE/OpenMS/bld/
+          ${{ steps.set-vars.outputs.xvfb }} ctest --output-on-failure -  V -S ../OpenMS/OpenMS/tools/ci/cibuild.cmake
+          retVal=$?
+          if [ $retVal -ne 0 ]; then
+              echo -e "\033[0;31m Errors in build:"
+              # TODO upload logs as artifact?
+              find $GITHUB_WORKSPACE/OpenMS/bld/ -name "LastBuild*" -type f -exec cat {} \;
+              # remove for next steps
+              find $GITHUB_WORKSPACE/OpenMS/bld/ -name "LastBuild*" -type f -exec rm {} \;
+          fi
+          exit $retVal
+      env:
+          # TODO allow actual choice of compiler instead of using default.
+          #  Problem: not all compilers are always in the PATH.
+          CMAKE_CXX_COMPILER: ${{ steps.set-vars.outputs.cxx_compiler }}
+          CMAKE_PREFIX_PATH: ${{ steps.tools-prefix.outputs.cmake_prefix }}
+          OPENMS_CONTRIB_LIBS: "${{ github.workspace }}/OpenMS/contrib"
+          CI_PROVIDER: "GitHub-Actions"
+          CMAKE_GENERATOR: "Ninja"
+          SOURCE_DIRECTORY: "${{ github.workspace }}/OpenMS"
+          BUILD_NAME: "${{ steps.extract_branch.outputs.RUN_NAME }}-${{ steps.set-vars.outputs.tp_folder }}-${{ runner.arch }}-${{ matrix.compiler }}-${{ matrix.compiler_ver }}-class-topp-${{ github.run_number }}"
+          ENABLE_STYLE_TESTING: "OFF"
+          ENABLE_TOPP_TESTING: "ON"
+          ENABLE_CLASS_TESTING: "ON"
+          ENABLE_DOCS: ${{ steps.set-vars.outputs.enable_docs }}
+          ENABLE_GCC_WERROR: "OFF" # TODO think about that
+          SEARCH_ENGINES_DIRECTORY: ${{ github.workspace }}/_thirdparty
+          WITH_GUI: "ON"
+          WITH_PARQUET: ${{(startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'ubuntu')) && 'ON' || 'OFF' }} #Currently no functionality at all for windows since it depends on contrib
+          SIGNING_IDENTITY: "-"
+          ADDRESS_SANITIZER: "Off"
+          BUILD_TYPE: "Release"
+          OPENMP: "ON"
+          BOOST_USE_STATIC: ${{ steps.set-vars.outputs.static_boost }}
+          COMPILE_PXDS: ${{ startsWith(matrix.os, 'ubuntu') && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'develop' && 'ON' || 'OFF' }} # test generation of pxds
+          #  BUILD_FLAGS: "-p:CL_MPCount=2" # For VS Generator and MSBuild
+          BUILD_FLAGS: "-j${{ steps.cpu-cores.outputs.count }}" # Ninja will otherwise use all cores (doesn't go well in GHA).
+          CMAKE_CCACHE_EXE: "ccache"
+          CCACHE_BASEDIR: ${{ github.workspace }}
+          CCACHE_DIR: ${{ github.workspace }}/.ccache
+          CCACHE_COMPRESS: true
+          CCACHE_COMPRESSLEVEL: 12
+          CCACHE_MAXSIZE: 400M
+          # TODO evaluate those options (we had them only on Linux before)
+          CCACHE_SLOPPINESS: time_macros,include_file_ctime,include_file_mtime
+          CCACHE_COMPILERCHECK: content
+          WITH_THERMORAWFILEPARSER_TEST: "OFF"
+          Eigen3_DIR: "${{ steps.tools-prefix.outputs.eigen_choco }}" # Eigen is installed on windows using choco
+          USE_EXTERNAL_JSON: ${{ (startsWith(matrix.os, 'macos') || startsWith(matrix.os, 'windows')) && 'OFF' || 'ON' }}          # It's literally only Ubuntu's package manager that forcibly bundles nlohmann_json w/ arrow. The rest we can control via a cmake option in contrib +
+          # Note that apache arrow's brew/apt packages are DIFFERENT. I believe Ubuntu's packages have Nlohmann_JSON bundled with them, while 
+          # brew doesn't. As such, this results in compatibility issues between OpenMS' Nlohmann_JSON and Ubuntu's system packages. 
+    - name: Test
+      shell: bash
+      run: |
+          ${{ steps.set-vars.outputs.xvfb }} ctest --output-on-failure -V -S $GITHUB_WORKSPACE/OpenMS/tools/ci/citest.cmake
+      env:
+          SOURCE_DIRECTORY: "${{ github.workspace }}/OpenMS"
+          CI_PROVIDER: "GitHub-Actions"
+          BUILD_NAME: "${{ steps.extract_branch.outputs.RUN_NAME }}-${{ steps.set-vars.outputs.tp_folder }}-${{ runner.arch }}-${{ matrix.compiler }}-${{ matrix.compiler_ver }}-class-topp-${{ github.run_number }}"
+          # The rest of the vars should be saved in the CMakeCache
