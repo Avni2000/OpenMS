@@ -6,9 +6,6 @@ name: openms-ci-full
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events or manually via workflow_dispatch
 on:
-  push:
-  branches:
-    - "win-conda"
   workflow_dispatch:
     inputs:
       package:
@@ -35,6 +32,7 @@ on:
     branches:
       - nightly
       - release/*
+      - win-conda
   pull_request:
     branches:
       - develop
