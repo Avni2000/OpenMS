@@ -6,7 +6,9 @@ name: build-test
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events or manually via workflow_dispatch
 on:
-  workflow_dispatch:
+  push:
+    branches: 
+      - "win-conda"
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build-and-test:
