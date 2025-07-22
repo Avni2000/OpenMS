@@ -224,27 +224,27 @@ jobs:
         # NOTE: x64 is hardcoded. No support for 32bit
         arch: x64
 
-    - name: Setup conda environment for Parquet (Windows only)
-      if: startsWith(matrix.os, 'windows')
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        auto-update-conda: true
-        python-version: 3.9
-        activate-environment: openms-parquet
-        use-mamba: true
+    # - name: Setup conda environment for Parquet (Windows only)
+    #   if: startsWith(matrix.os, 'windows')
+    #   uses: conda-incubator/setup-miniconda@v3
+    #   with:
+    #     auto-update-conda: true
+    #     python-version: 3.9
+    #     activate-environment: openms-parquet
+    #     use-mamba: true
 
-    - name: Install Parquet dependencies (Windows only)
-      if: startsWith(matrix.os, 'windows')
-      shell: bash -el {0}
-      run: |
-        conda activate openms-parquet
-        # None of the other arrow sublibraries seemed necessary, but it's an easy addition.
-        conda install -c conda-forge libarrow libparquet -y
-        # Get the conda environment path for later use
-        echo "CONDA_ENV_PATH=$(conda info --base)/envs/openms-parquet" >> $GITHUB_ENV
-        # Add conda environment to PATH for cmake to find the libraries
-        echo "$(conda info --base)/envs/openms-parquet/bin" >> $GITHUB_PATH
-        echo "$(conda info --base)/envs/openms-parquet/Library/bin" >> $GITHUB_PATH
+    # - name: Install Parquet dependencies (Windows only)
+    #   if: startsWith(matrix.os, 'windows')
+    #   shell: bash -el {0}
+    #   run: |
+    #     conda activate openms-parquet
+    #     # None of the other arrow sublibraries seemed necessary, but it's an easy addition.
+    #     conda install -c conda-forge libarrow libparquet -y
+    #     # Get the conda environment path for later use
+    #     echo "CONDA_ENV_PATH=$(conda info --base)/envs/openms-parquet" >> $GITHUB_ENV
+    #     # Add conda environment to PATH for cmake to find the libraries
+    #     echo "$(conda info --base)/envs/openms-parquet/bin" >> $GITHUB_PATH
+    #     echo "$(conda info --base)/envs/openms-parquet/Library/bin" >> $GITHUB_PATH
 
     - name: Install Qt (Windows)
       if: startsWith(matrix.os, 'windows')
@@ -284,6 +284,17 @@ jobs:
           choco install eigen -y --no-progress
           echo "eigen_choco=C:\ProgramData\chocolatey\lib\eigen\share\cmake" >> $GITHUB_OUTPUT
           choco install doxygen.portable ghostscript graphviz -y --no-progress
+          
+          # Setup vcpkg for Arrow dependencies
+          echo "Setting up vcpkg for Arrow dependencies..."
+          git clone https://github.com/Microsoft/vcpkg.git vcpkg
+          cd vcpkg
+          ./bootstrap-vcpkg.bat
+          # Install Arrow and Parquet via vcpkg with binary caching
+          ./vcpkg install arrow[parquet] --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
+          cd ..
+          echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
+          echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/vcpkg/installed/x64-windows" >> $GITHUB_OUTPUT
           
           if [[ "${{ steps.set-vars.outputs.pkg_type }}" != "none" ]]; then
             # uses a custom NSIS, which provides 8-k string support and has UltraModernUI integrated already
