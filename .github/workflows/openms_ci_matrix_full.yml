@@ -285,17 +285,21 @@ jobs:
           echo "eigen_choco=C:\ProgramData\chocolatey\lib\eigen\share\cmake" >> $GITHUB_OUTPUT
           choco install doxygen.portable ghostscript graphviz -y --no-progress
           
+          echo "(Before installing vcpkg)Current pwd: $(pwd)"
+          echo "ls:"
+          ls
+
           # Setup vcpkg for Arrow dependencies
           echo "Setting up vcpkg for Arrow dependencies..."
+          cd OpenMS
           git submodule update --init vcpkg
           echo "Current pwd: $(pwd)"
-          
           cd vcpkg
           ./bootstrap-vcpkg.bat
           # Install Arrow and Parquet via vcpkg with binary caching
           ./vcpkg install --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
-          cd ..
-          echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
+          cd ../..  # Go back to workspace root
+          echo "VCPKG_ROOT=$(pwd)/OpenMS/vcpkg"
           # debugging
           ls -la $(pwd)/vcpkg/installed/x64-windows/lib/ | grep -i arrow || echo "No Arrow libs found"
           ls -la $(pwd)/vcpkg/installed/x64-windows/share/ | grep -i arrow || echo "No Arrow cmake files found"
