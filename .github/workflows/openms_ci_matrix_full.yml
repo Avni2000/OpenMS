@@ -286,7 +286,7 @@ jobs:
           choco install doxygen.portable ghostscript graphviz -y --no-progress
           
           # Setup vcpkg for Arrow dependencies
-          echo "Setting up vcpkg for Arrow dependencies..." >> $GITHUB_OUTPUT
+          echo "Setting up vcpkg for Arrow dependencies..."
           git submodule update --init vcpkg
           echo "Current pwd: $(pwd)"
           
