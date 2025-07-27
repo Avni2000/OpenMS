@@ -286,16 +286,24 @@ jobs:
           choco install doxygen.portable ghostscript graphviz -y --no-progress
           
           # Setup vcpkg for Arrow dependencies
-          echo "Setting up vcpkg for Arrow dependencies..."
-          git clone https://github.com/Microsoft/vcpkg.git vcpkg
+          echo "Setting up vcpkg for Arrow dependencies..." >> $GITHUB_OUTPUT
+          git submodule update --init vcpkg
+          echo "Current pwd: $(pwd)"
+          
           cd vcpkg
           ./bootstrap-vcpkg.bat
           # Install Arrow and Parquet via vcpkg with binary caching
-          ./vcpkg install arrow[parquet] --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
+          ./vcpkg install --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
           cd ..
           echo "VCPKG_ROOT=$(pwd)/vcpkg" >> $GITHUB_ENV
+          # debugging
+          ls -la $(pwd)/vcpkg/installed/x64-windows/lib/ | grep -i arrow || echo "No Arrow libs found"
+          ls -la $(pwd)/vcpkg/installed/x64-windows/share/ | grep -i arrow || echo "No Arrow cmake files found"
+          find $(pwd)/vcpkg/installed/x64-windows -name "*arrow*" -type d
+
           echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/vcpkg/installed/x64-windows" >> $GITHUB_OUTPUT
-          
+          echo "Checking vcpkg Arrow installation..."
+
           if [[ "${{ steps.set-vars.outputs.pkg_type }}" != "none" ]]; then
             # uses a custom NSIS, which provides 8-k string support and has UltraModernUI integrated already
             curl --no-progress-meter -L -o NSIS.tar.gz https://github.com/OpenMS/NSIS/raw/main/NSIS.tar.gz
