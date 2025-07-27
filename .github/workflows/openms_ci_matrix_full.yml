@@ -302,6 +302,8 @@ jobs:
           git submodule update --init vcpkg
           echo "Current pwd: $(pwd)"
           cd vcpkg
+          git pull origin master
+          echo "Current pwd: $(pwd)"
           ./bootstrap-vcpkg.bat
           # Install Arrow and Parquet via vcpkg with binary caching
           ./vcpkg install --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
