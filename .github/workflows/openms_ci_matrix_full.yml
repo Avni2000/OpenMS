@@ -310,11 +310,9 @@ jobs:
           cd ../..  # Go back to workspace root
           echo "VCPKG_ROOT=$(pwd)/OpenMS/vcpkg"
           # debugging
-          ls -la $(pwd)/OpenMS/vcpkg/installed/x64-windows/lib/ | grep -i arrow || echo "No Arrow libs found"
-          ls -la $(pwd)/OpenMS/vcpkg/installed/x64-windows/share/ | grep -i arrow || echo "No Arrow cmake files found"
-          ls -la $(pwd)/OpenMS/vcpkg/installed/x64-windows | grep -i arrow || echo "Arrow not even mentioned"
-
-          echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/OpenMS/vcpkg/installed/x64-windows" >> $GITHUB_OUTPUT
+          tree /F $(pwd)/OpenMS/vcpkg_installed/x64-windows | grep -i arrow || echo "Arrow not even mentioned"
+          tree $(pwd)/OpenMS 
+          echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/OpenMS/vcpkg_installed/x64-windows" >> $GITHUB_OUTPUT
           echo "Checking vcpkg Arrow installation..."
 
           if [[ "${{ steps.set-vars.outputs.pkg_type }}" != "none" ]]; then
