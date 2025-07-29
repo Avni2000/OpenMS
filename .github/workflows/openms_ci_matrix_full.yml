@@ -331,9 +331,13 @@ jobs:
           
           # Debug: Show vcpkg installation structure
           echo "Debugging vcpkg installation structure:"
-          tree /F $(pwd)/OpenMS/vcpkg_installed/x64-windows 2>/dev/null || echo "Tree command failed or directory not found"
-          echo "Alternative: Using dir to show structure:"
-          dir /S $(pwd)/OpenMS/vcpkg_installed/x64-windows 2>/dev/null || echo "Dir command failed or directory not found"
+          if [[ -d "$(pwd)/OpenMS/vcpkg_installed/x64-windows" ]]; then
+            echo "Directory exists, showing structure:"
+            find $(pwd)/OpenMS/vcpkg_installed/x64-windows -type f -name "*arrow*" -o -name "*parquet*" | head -20 || echo "Find command failed"
+            ls -la $(pwd)/OpenMS/vcpkg_installed/x64-windows/ || echo "ls command failed"
+          else
+            echo "Directory $(pwd)/OpenMS/vcpkg_installed/x64-windows does not exist"
+          fi
           
           echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/OpenMS/vcpkg_installed/x64-windows" >> $GITHUB_OUTPUT
           echo "Checking vcpkg Arrow installation..."
