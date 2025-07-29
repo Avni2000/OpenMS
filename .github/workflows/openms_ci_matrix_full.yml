@@ -28,6 +28,18 @@ on:
         type: boolean
         description: Update website and create announcement material for release
         default: false
+      test_ubuntu:
+        type: boolean
+        description: Test on Ubuntu
+        default: true
+      test_windows:
+        type: boolean
+        description: Test on Windows
+        default: true
+      test_mac:
+        type: boolean
+        description: Test on macOS
+        default: true
   push:
     branches:
       - nightly
@@ -51,6 +63,7 @@ jobs:
             # VS 2022: 14.30-14.39 (corresponds to MSVC v143)
             # VS 2019: 14.20-14.29 (corresponds to MSVC v142)
             compiler_ver: 14.36    # Specific toolset version for VS 2022 -- must (roughly) match Qt6 compiler (see below)
+            enabled: ${{ github.event_name != 'workflow_dispatch' || inputs.test_windows }}
 
           - os: macos-13
             # Since the appleclang version is dependent on the XCode versions that are installed
@@ -59,6 +72,7 @@ jobs:
             compiler: xcode
             # TODO implement support for other versions
             compiler_ver: 14.2
+            enabled: ${{ github.event_name != 'workflow_dispatch' || inputs.test_mac }}
 
           - os: macos-14
             # Since the appleclang version is dependent on the XCode versions that are installed
@@ -67,13 +81,15 @@ jobs:
             compiler: xcode
             # TODO implement support for other versions
             compiler_ver: 15.0.1
+            enabled: ${{ github.event_name != 'workflow_dispatch' || inputs.test_mac }}
 
           # Make sure the compilers are available in that version on the GH runners
           # We are not installing anything.
           - os: ubuntu-22.04
             compiler: g++
-
             compiler_ver: 11
+            enabled: ${{ github.event_name != 'workflow_dispatch' || inputs.test_ubuntu }}
+
           # Make sure the compilers are available in that version on the GH runners
           # We are not installing anything.
           
@@ -85,6 +101,9 @@ jobs:
           - os: ubuntu-22.04
             compiler: clang++
             compiler_ver: 15
+            enabled: ${{ github.event_name != 'workflow_dispatch' || inputs.test_ubuntu }}
+        exclude:
+          - enabled: false
     outputs:
       version_number: ${{ steps.create_changelog.outputs.version_number }}
 
@@ -309,9 +328,13 @@ jobs:
           ./vcpkg install --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
           cd ../..  # Go back to workspace root
           echo "VCPKG_ROOT=$(pwd)/OpenMS/vcpkg"
-          # debugging
-          tree /F $(pwd)/OpenMS/vcpkg_installed/x64-windows | grep -i arrow || echo "Arrow not even mentioned"
-          tree $(pwd)/OpenMS 
+          
+          # Debug: Show vcpkg installation structure
+          echo "Debugging vcpkg installation structure:"
+          tree /F $(pwd)/OpenMS/vcpkg_installed/x64-windows 2>/dev/null || echo "Tree command failed or directory not found"
+          echo "Alternative: Using dir to show structure:"
+          dir /S $(pwd)/OpenMS/vcpkg_installed/x64-windows 2>/dev/null || echo "Dir command failed or directory not found"
+          
           echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/OpenMS/vcpkg_installed/x64-windows" >> $GITHUB_OUTPUT
           echo "Checking vcpkg Arrow installation..."
 
@@ -582,7 +605,7 @@ jobs:
             --exclude='vcpkg*/**' \
             -czf OpenMS-${{ steps.create_changelog.outputs.version_number }}.tar.gz -C ${{ github.workspace }} OpenMS
         
-   # Upload the source tar
+   # Upload the source tar as artifact
     - name: Upload source tar as artifact
       if: steps.set-vars.outputs.pkg_type != 'none' && startsWith(matrix.os, 'ubuntu')
       uses: actions/upload-artifact@v4
