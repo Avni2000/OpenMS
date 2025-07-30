@@ -306,21 +306,41 @@ jobs:
           echo "Current pwd: $(pwd)"
           ./bootstrap-vcpkg.bat
           # Install Arrow and Parquet via vcpkg with binary caching
-          ./vcpkg install --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
+          ./vcpkg install arrow:x64-windows parquet:x64-windows --binarysource=clear --binarysource=x-gha,readwrite
           cd ../..  # Go back to workspace root
           echo "VCPKG_ROOT=$(pwd)/OpenMS/vcpkg"
           
-          # Debug: Show vcpkg installation structure
+          # Debug: Show vcpkg installation structure and find cmake config files
           echo "Debugging vcpkg installation structure:"
+          VCPKG_CMAKE_PATHS=""
           if [[ -d "$(pwd)/OpenMS/vcpkg_installed/x64-windows" ]]; then
             echo "Directory exists, showing structure:"
             find $(pwd)/OpenMS/vcpkg_installed/x64-windows -type f -name "*arrow*" -o -name "*parquet*" | head -20 || echo "Find command failed"
+            
+            # Find Arrow cmake config files and add directory to paths
+            ARROW_CMAKE_DIR=$(find $(pwd)/OpenMS/vcpkg_installed/x64-windows -name "*ArrowConfig.cmake" -o -name "*arrow-config.cmake" | head -1 | xargs dirname 2>/dev/null || echo "")
+            if [[ -n "$ARROW_CMAKE_DIR" ]]; then
+              echo "Found Arrow cmake config at: $ARROW_CMAKE_DIR"
+              VCPKG_CMAKE_PATHS="$VCPKG_CMAKE_PATHS;$ARROW_CMAKE_DIR"
+            else
+              echo "Arrow cmake config not found"
+            fi
+            
+            # Find Parquet cmake config files and add directory to paths
+            PARQUET_CMAKE_DIR=$(find $(pwd)/OpenMS/vcpkg_installed/x64-windows -name "*ParquetConfig.cmake" -o -name "*parquet-config.cmake" | head -1 | xargs dirname 2>/dev/null || echo "")
+            if [[ -n "$PARQUET_CMAKE_DIR" ]]; then
+              echo "Found Parquet cmake config at: $PARQUET_CMAKE_DIR"
+              VCPKG_CMAKE_PATHS="$VCPKG_CMAKE_PATHS;$PARQUET_CMAKE_DIR"
+            else
+              echo "Parquet cmake config not found"
+            fi
+            
             ls -la $(pwd)/OpenMS/vcpkg_installed/x64-windows/ || echo "ls command failed"
           else
             echo "Directory $(pwd)/OpenMS/vcpkg_installed/x64-windows does not exist"
           fi
           
-          echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/OpenMS/vcpkg_installed/x64-windows" >> $GITHUB_OUTPUT
+          echo "cmake_prefix=$QT_ROOT_DIR/lib/cmake;$QT_ROOT_DIR;$(pwd)/OpenMS/vcpkg_installed/x64-windows$VCPKG_CMAKE_PATHS" >> $GITHUB_OUTPUT
           echo "Checking vcpkg Arrow installation..."
 
           if [[ "${{ steps.set-vars.outputs.pkg_type }}" != "none" ]]; then
