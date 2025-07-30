@@ -306,7 +306,7 @@ jobs:
           echo "Current pwd: $(pwd)"
           ./bootstrap-vcpkg.bat
           # Install Arrow and Parquet via vcpkg with binary caching
-          ./vcpkg install arrow:x64-windows parquet:x64-windows --binarysource=clear --binarysource=x-gha,readwrite
+          ./vcpkg install --triplet x64-windows --binarysource=clear --binarysource=x-gha,readwrite
           cd ../..  # Go back to workspace root
           echo "VCPKG_ROOT=$(pwd)/OpenMS/vcpkg"
           
