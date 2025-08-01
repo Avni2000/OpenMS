@@ -45,9 +45,9 @@ jobs:
           
       - name: Clone Bioconda recipes repository and add our changes (e.g., version with 'dev') on top of it
         run: |
-          git clone https://github.com/OpenMS/bioconda-recipes.git bioconda-recipes
+          git clone https://github.com/Avni2000/bioconda-recipes.git bioconda-recipes
           cd bioconda-recipes
-          git checkout -b nightly origin/nightly
+          git checkout -b nightly origin/temp-arrow
           git remote add bioconda https://github.com/bioconda/bioconda-recipes.git
           git fetch bioconda master
           git rebase bioconda/master         
@@ -69,7 +69,7 @@ jobs:
         run: |
           cd bioconda-recipes
           ls -l $GITHUB_WORKSPACE/output
-          anaconda -v -t ${{ secrets.ANACONDA_TOKEN }} upload -u openms --no-progress --force $GITHUB_WORKSPACE/output/linux-64/*.tar.bz2
+          anaconda -v -t ${{ secrets.ANACONDA_TOKEN }} upload -u Avni2000 --no-progress --force $GITHUB_WORKSPACE/output/linux-64/*.tar.bz2
 
       - name: Check upload status
         run: |
