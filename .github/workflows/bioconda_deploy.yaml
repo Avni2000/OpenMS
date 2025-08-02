@@ -31,6 +31,7 @@ jobs:
 
       - name: Prepare output directory
         run: |       
+          conda activate bioconda_env
           mkdir -p $GITHUB_WORKSPACE/output/noarch
           touch $GITHUB_WORKSPACE/output/noarch/repodata.json
           conda install bioconda-utils -y
