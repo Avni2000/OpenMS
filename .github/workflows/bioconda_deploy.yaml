@@ -17,8 +17,12 @@ jobs:
     defaults:
       run:
         shell: bash -le {0}  # Important! Use login shell for proper conda initialization
-        
+    
     steps:
+      - name: Make tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install build-essential -y
       - name: Set up Conda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -35,8 +39,6 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/output/noarch
           touch $GITHUB_WORKSPACE/output/noarch/repodata.json
           conda install bioconda-utils -y
-          conda install make cmake cxx-compiler -y
-          # conda install gcc-linux-64 gxx-linux-64 -y
           conda index $GITHUB_WORKSPACE/output
           ls -l
           ls -l $GITHUB_WORKSPACE/output
