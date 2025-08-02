@@ -50,7 +50,8 @@ jobs:
           git checkout -b nightly origin/temp-arrow
           git remote add bioconda https://github.com/bioconda/bioconda-recipes.git
           git fetch bioconda master
-          git rebase bioconda/master         
+          git branch
+          git rebase -X theirs bioconda/master
 
       - name: Lint and build OpenMS Bioconda packages
         run: |
