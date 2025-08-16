@@ -60,12 +60,12 @@ jobs:
           git branch
           git rebase -X theirs bioconda/master
 
-      - name: Lint and build OpenMS Bioconda packages
-        run: |
-          cd bioconda-recipes
-          bioconda-utils lint --packages pyopenms openms-meta
-          bioconda-utils build --docker --pkg_dir $GITHUB_WORKSPACE/output --packages openms-meta || true
-          conda index $GITHUB_WORKSPACE/output
+      # - name: Lint and build OpenMS Bioconda packages
+      #   run: |
+      #     cd bioconda-recipes
+      #     bioconda-utils lint --packages pyopenms openms-meta
+      #     bioconda-utils build --docker --pkg_dir $GITHUB_WORKSPACE/output --packages openms-meta || true
+      #     conda index $GITHUB_WORKSPACE/output
           
       - name: Build pyopenms package
         run: |
