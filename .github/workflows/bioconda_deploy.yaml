@@ -6,11 +6,10 @@ on:
       branch:
         description: "Branch to deploy from"
         required: true
-        default: "nightly"
+        default: "nightly" # unnecessary! 
   push:
     branches:
-      - nightly
-
+      - nightly # this should be develop tbh
 jobs:
   bioconda-deploy:
     runs-on: ubuntu-latest
@@ -63,12 +62,12 @@ jobs:
           git branch
           git rebase -X theirs bioconda/master
 
-      # - name: Lint and build OpenMS Bioconda packages
-      #   run: |
-      #     cd bioconda-recipes
-      #     bioconda-utils lint --packages pyopenms openms-meta
-      #     bioconda-utils build --docker --pkg_dir $GITHUB_WORKSPACE/output --packages openms-meta || true
-      #     conda index $GITHUB_WORKSPACE/output
+      - name: Lint and build OpenMS Bioconda packages
+        run: |
+          cd bioconda-recipes
+          bioconda-utils lint --packages pyopenms openms-meta
+          bioconda-utils build --docker --pkg_dir $GITHUB_WORKSPACE/output --packages openms-meta || true
+          conda index $GITHUB_WORKSPACE/output
           
       - name: Build pyopenms package
         run: |
