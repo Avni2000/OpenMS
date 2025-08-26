@@ -32,7 +32,10 @@ jobs:
           python-version: 3.9
           channels: conda-forge,bioconda,defaults
           channel-priority: true
-
+      - name: Conda config and clean
+        run: |
+          conda config --set channel_priority strict
+          conda clean -a -y
       - name: Prepare output directory
         run: |       
           conda activate bioconda_env
@@ -54,7 +57,7 @@ jobs:
         run: |
           git clone https://github.com/Avni2000/bioconda-recipes.git bioconda-recipes
           cd bioconda-recipes
-          git checkout -b nightly origin/temp-arrow
+          git checkout -b nightly origin/revert-check
           git remote add bioconda https://github.com/bioconda/bioconda-recipes.git
           git fetch bioconda master
           git branch
