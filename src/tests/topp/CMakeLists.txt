@@ -244,6 +244,19 @@ set_tests_properties("TOPP_MassTraceExtractor_1_out" PROPERTIES DEPENDS "TOPP_Ma
 add_test("TOPP_MassTraceExtractor_2" ${TOPP_BIN_PATH}/MassTraceExtractor -test -ini ${DATA_DIR_TOPP}/MassTraceExtractor_2.ini -in ${DATA_DIR_TOPP}/MassTraceExtractor_1_input.mzML -out MassTraceExtractor_2.tmp.featureXML)
 add_test("TOPP_MassTraceExtractor_2_out" ${DIFF} -whitelist "id=" -in1 MassTraceExtractor_2.tmp.featureXML -in2 ${DATA_DIR_TOPP}/MassTraceExtractor_2_output.featureXML )
 set_tests_properties("TOPP_MassTraceExtractor_2_out" PROPERTIES DEPENDS "TOPP_MassTraceExtractor_2")
+# test ion mobility functionality
+# a smaller ion mobility test (+2 isotopic envelope)
+add_test("TOPP_MassTraceExtractor_4" ${TOPP_BIN_PATH}/MassTraceExtractor -test -ini ${DATA_DIR_TOPP}/MassTraceExtractor_4.ini -in ${DATA_DIR_TOPP}/MassTraceExtractor_4_input.mzML -out MassTraceExtractor_4.tmp.featureXML)
+add_test("TOPP_MassTraceExtractor_4_out" ${DIFF} -whitelist "id=" -in1 MassTraceExtractor_4.tmp.featureXML -in2 ${DATA_DIR_TOPP}/MassTraceExtractor_4_output.featureXML )
+set_tests_properties("TOPP_MassTraceExtractor_4_out" PROPERTIES DEPENDS "TOPP_MassTraceExtractor_4")
+# a larger LC-MS map with ion mobility data
+add_test("TOPP_MassTraceExtractor_5" ${TOPP_BIN_PATH}/MassTraceExtractor -test -ini ${DATA_DIR_TOPP}/MassTraceExtractor_4.ini -in ${DATA_DIR_TOPP}/MassTraceExtractor_5_input.mzML -out MassTraceExtractor_5.tmp.featureXML)
+add_test("TOPP_MassTraceExtractor_5_out" ${DIFF} -whitelist "id=" -in1 MassTraceExtractor_5.tmp.featureXML -in2 ${DATA_DIR_TOPP}/MassTraceExtractor_5_output.featureXML )
+set_tests_properties("TOPP_MassTraceExtractor_5_out" PROPERTIES DEPENDS "TOPP_MassTraceExtractor_5")
+# temporary test. Isolate one trace that causes test to fail on MacOS 13-14 and Ubuntu.
+add_test("TOPP_MassTraceExtractor_6" ${TOPP_BIN_PATH}/MassTraceExtractor -test -ini ${DATA_DIR_TOPP}/MassTraceExtractor_4.ini -in ${DATA_DIR_TOPP}/MassTraceExtractor_6_input.mzML -out MassTraceExtractor_6.tmp.featureXML)
+add_test("TOPP_MassTraceExtractor_6_out" ${DIFF} -whitelist "id=" -in1 MassTraceExtractor_6.tmp.featureXML -in2 ${DATA_DIR_TOPP}/MassTraceExtractor_6_output.featureXML )
+set_tests_properties("TOPP_MassTraceExtractor_6_out" PROPERTIES DEPENDS "TOPP_MassTraceExtractor_6")
 
 #------------------------------------------------------------------------------
 # FeatureFinderMetabo test
@@ -3139,6 +3152,16 @@ set_tests_properties("TOPP_NucleicAcidSearchEngine_22_out" PROPERTIES DEPENDS "T
 add_test("TOPP_RNAMassCalculator_1" ${TOPP_BIN_PATH}/RNAMassCalculator -test -in_seq "AUCGGC" -charge -1 -2 -out RNAMassCalculator.tmp.txt)
 add_test("TOPP_RNAMassCalculator_1_out" ${DIFF} -in1 RNAMassCalculator.tmp.txt -in2 ${DATA_DIR_TOPP}/RNAMassCalculator_1.txt)
 set_tests_properties("TOPP_RNAMassCalculator_1_out" PROPERTIES DEPENDS "TOPP_RNAMassCalculator_1")
+
+#------------------------------------------------------------------------------
+# Digestor:
+add_test("TOPP_Digestor_1" ${TOPP_BIN_PATH}/Digestor -test -in ${DATA_DIR_TOPP}/Digestor_1_input.fasta -out Digestor_1_output.tmp.fasta)
+add_test("TOPP_Digestor_1_out" ${DIFF} -in1 Digestor_1_output.tmp.fasta -in2 ${DATA_DIR_TOPP}/Digestor_1_output.fasta)
+set_tests_properties("TOPP_Digestor_1_out" PROPERTIES DEPENDS "TOPP_Digestor_1")
+add_test("TOPP_Digestor_2" ${TOPP_BIN_PATH}/Digestor -test -in ${DATA_DIR_TOPP}/Digestor_1_input.fasta -out Digestor_2_output.tmp.fasta -min_length 1 -missed_cleavages 0 -replace_ambiguous)
+add_test("TOPP_Digestor_2_out" ${DIFF} -in1 Digestor_2_output.tmp.fasta -in2 ${DATA_DIR_TOPP}/Digestor_2_output.fasta)
+set_tests_properties("TOPP_Digestor_2_out" PROPERTIES DEPENDS "TOPP_Digestor_2")
+
 
 #------------------------------------------------------------------------------
 # EPIFANY:
