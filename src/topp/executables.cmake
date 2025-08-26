@@ -25,6 +25,7 @@ EICExtractor
 Epifany
 ExternalCalibration
 FalseDiscoveryRate
+FeatureCSVExporter
 FeatureFinderCentroided
 FeatureFinderIdentification
 FeatureFinderMetabo

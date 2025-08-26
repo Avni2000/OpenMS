@@ -47,6 +47,7 @@ namespace OpenMS
     TypeNameBinding(FileTypes::MZDATA, "mzData", "mzData raw data file", {PROP::PROVIDES_EXPERIMENT, PROP::READABLE, PROP::WRITEABLE}),
     TypeNameBinding(FileTypes::MZXML, "mzXML", "mzXML raw data file", {PROP::PROVIDES_EXPERIMENT, PROP::READABLE, PROP::WRITEABLE}),
     TypeNameBinding(FileTypes::FEATUREXML, "featureXML", "OpenMS feature map", {PROP::PROVIDES_FEATURES, PROP::READABLE, PROP::WRITEABLE}),
+    TypeNameBinding(FileTypes::FEATURECSV, "csv", "OpenMS feature map in CSV format", {PROP::PROVIDES_FEATURES, PROP::WRITEABLE}),
     TypeNameBinding(FileTypes::IDXML, "idXML", "OpenMS peptide identification file", {PROP::PROVIDES_IDENTIFICATIONS, PROP::READABLE, PROP::WRITEABLE}),
     TypeNameBinding(FileTypes::CONSENSUSXML, "consensusXML", "OpenMS consensus feature map", {PROP::PROVIDES_CONSENSUSFEATURES, PROP::READABLE, PROP::WRITEABLE}),
     TypeNameBinding(FileTypes::MGF, "mgf", "mascot generic format file", {PROP::PROVIDES_EXPERIMENT, PROP::READABLE, PROP::WRITEABLE}),

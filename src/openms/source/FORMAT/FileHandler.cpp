@@ -14,6 +14,7 @@
 #include <OpenMS/FORMAT/MzXMLFile.h>
 #include <OpenMS/FORMAT/MzMLFile.h>
 #include <OpenMS/FORMAT/FeatureXMLFile.h>
+#include <OpenMS/FORMAT/FeatureCSVFile.h>
 #include <OpenMS/FORMAT/ConsensusXMLFile.h>
 #include <OpenMS/FORMAT/MzDataFile.h>
 #include <OpenMS/FORMAT/MascotGenericFile.h>
@@ -998,6 +999,13 @@ namespace OpenMS
         FeatureXMLFile f;
         f.setLogType(log);
         f.getOptions() = f_options_;
+        f.store(filename, map);
+      }
+      break;
+
+      case FileTypes::FEATURECSV:
+      {
+        FeatureCSVFile f;
         f.store(filename, map);
       }
       break;

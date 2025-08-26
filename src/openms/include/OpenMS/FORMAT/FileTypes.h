@@ -35,6 +35,7 @@ namespace OpenMS
       MZDATA,             ///< MzData file (.mzData)
       MZXML,              ///< MzXML file (.mzXML)
       FEATUREXML,         ///< %OpenMS feature file (.featureXML)
+      FEATURECSV,         ///< %OpenMS feature file in CSV format (.csv)
       IDXML,              ///< %OpenMS identification format (.idXML)
       CONSENSUSXML,       ///< %OpenMS consensus map format (.consensusXML)
       MGF,                ///< Mascot Generic Format (.mgf)
